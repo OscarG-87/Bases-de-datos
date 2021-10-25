@@ -1,0 +1,5 @@
+Win+shift+s    recortes
+win+v   historial portapapeles
+win+ w   widgets
+win +h voz a texto
+win + .   emoji
