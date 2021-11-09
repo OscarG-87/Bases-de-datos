@@ -54,26 +54,43 @@ select adddate(last_day(curdate()), 2)
 select now()- interval day(now()) day
 SELECT LAST_DAY('2021-10-15')
 
-***compra test**
+
 delimiter %%
-create procedure compra_test (in FECHA datetime, in LUGAR varchar(20), in ID int, in VALOR decimal, in PIN int)
+CREATE PROCEDURE compra(in FECHA datetime, in LUGAR varchar(20), in ID int, in VALOR decimal, in PIN int)
 begin
 declare p int;
 declare f datetime;
-SELECT di.pin into p
-from dispositivos as di
-inner join clientes as cl
-on di.id_dispositivo = cl.id_dispositivo
-where ID = cl.id_cliente;
+declare c decimal;
+SELECT 
+    cl.cupo_individual - SUM(co.valor)
+INTO c FROM
+    clientes AS cl
+        INNER JOIN
+    compras AS co ON cl.id_cliente = co.id_cliente
+WHERE
+    ID = cl.id_cliente;
+SELECT 
+    di.pin
+INTO p FROM
+    dispositivos AS di
+        INNER JOIN
+    clientes AS cl ON di.id_dispositivo = cl.id_dispositivo
+WHERE
+    ID = cl.id_cliente;
 set f = LAST_DAY(FECHA);
 if FECHA = f 
-THEN
-SELECT ' LA FECHA DE COMPRA NO ESTÁ AUTORIZADA'as Alerta;
+	THEN
+	select' La fecha de compra no está autorizada' as TRANSACCIÓN_RECHAZADA;
 elseif
-PIN != p
-then
-select 'Pin uncorrecto';
+	PIN != p
+	then
+	seLECT 'Pin incorrecto' as TRANSACCIÓN_RECHAZADA;
+elseif 
+	VALOR > c
+	then
+	select 'Cupo excedido' as TRANSACCIÓN_RECHAZADA;
 else
+	select 'Compra finalizada' as TRANSACCIÓN_EXITOSA;
 insert into compras
     set
     fecha = FECHA,
@@ -81,111 +98,28 @@ insert into compras
     id_cliente = ID,
 	valor = VALOR;
 END IF;
-end
-delimiter %%
-
-delimiter %%
-CREATE PROCEDURE compra(in FECHA datetime, in LUGAR varchar(20), in ID int, in VALOR decimal, in PIN int)
-begin
-declare c decimal;
-SELECT cl.cupo_individual-sum(valor) into c
-from clientes as cl inner join compras as co
-on cl.id_cliente = co.id_cliente
-where ID = cl.id_cliente;
-if  VALOR > c
-THEN
-	select 'cupo excedido';
-else
-    insert into compras
-    set
-    fecha = FECHA,
-    lugar = LUGAR,
-    id_cliente = ID,
-	valor = VALOR;
-END IF;
 end %%
 delimiter %%
 
-
-create view cupo as
-select (cl.cupo_individual-co.valor) as cuporestante
-from compras as co
-inner join clientes as cl
-on co.id_cliente = cl.id_cliente
-where co.id_cliente = 
-
+/*Brindar reportes al cliente*/
 
 delimiter %%
-create procedure conteo(in pid_cliente int, in pvalor int)
-begin
-declare cupoi int;
-select cl.cupo_individual-co.valor into cupoi 
-from clientes as cl
-inner join compras as co
-on cl.id_cliente = co.id_cliente
-where co.id_cliente = pid_cliente;
-select  cupoi;
-end %%
-delimiter %%
-
-
-delimiter %%
-create procedure compra (in pfecha datetime, in plugar varchar(20), in pid_cliente int, in pvalor decimal)
-begin
-declare cupo decimal;
-select cl.cupo_individual - co.valor into cupo
-from clientes as cl
-join compras as co
-on cl.id_cliente = co.id_cliente
-where co.id_cliente = pid_cliente;
-if pvalor> cupo
-then
-	select  cupo as cupo,'"El valor supera el cupo designado"' as '¡ERROR EN TRANSACCIÓN!';
-else 
-	insert into compras
-    set
-    fecha = pfecha,
-    lugar = plugar,
-    id_cliente = pid_cliente,
-	valor = pvalor;
-end if;
-end %%
-delimiter %%
-drop procedure compra;
-
-******/*Brindar reportes al cliente*/******
-
-delimiter %%
-create procedure reporte_G (in pnombre_cliente varchar (30))
-begin
-select cl.nombre_cliente,cl.id_dispositivo,co.fecha,co.lugar,co.valor
-from clientes as cl
-inner join compras as co
-on cl.id_cliente = co.id_cliente
-where pnombre_cliente = nombre_cliente;
-end %%
-delimiter %%
-
-delimiter %%
-create procedure reporte_2 (in fecha_inicial datetime, in fecha_final datetime)
+create procedure Reporte_Compras (in CEDULA int,in fecha_inicial datetime, in fecha_final datetime)
 begin
 select cl.nombre_cliente AS Cliente,cl.id_dispositivo as Dispositivo,co.fecha as Fecha_Compra,co.lugar as Establecimiento,co.valor as Valor
 from clientes as cl
 inner join compras as co
 on cl.id_cliente = co.id_cliente
-where co.id_cliente = 2 and fecha between fecha_inicial and fecha_final
+where co.id_cliente = CEDULA 
 union
 select '','','','TOTAL =', sum(valor)
 from compras
-where fecha between fecha_inicial and fecha_final;
+where fecha between fecha_inicial and fecha_final and id_cliente = CEDULA;
 end %%
 delimiter %%
-select * from compras
-where fecha between fecha_inicial and fecha_final;
-select '',sum(valor) as total
 
 
-*****Autorizar cupo******
+/*Autorizar cupo*/
 delimiter %%
 CREATE PROCEDURE aumentar_cupo(in ID int, in VALOR DECIMAL)
 begin
